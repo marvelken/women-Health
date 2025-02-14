@@ -17,14 +17,12 @@ const initPermit = () => {
 const permit = initPermit();
 
 // Define our action types
-export type Actions = "view" | "update";
+export type Actions = "viewrecordslimited" | "viewrecordsfull" | "update";
 
 // Define our resource types
 export type Resources = 
-  | "PersonalHealth"    // For the user's own health data
-  | "PartnerHealth"     // For partner view
-  | "PatientHealth"     // For doctor view
-  | "ChildHealth";      // For parent view
+  | "HealthRecords"    // For the user's own health data
+  | "ShareForm"     // For partner view
 
 // Define our role types
 export type UserRole = "user" | "partner" | "doctor" | "parent";
@@ -73,30 +71,28 @@ const check = async (action: Actions, resource: Resources, userId: string) => {
   }
 };
 
-// Health data permission checks
+
 export const checkHealthPermissions = async (userId: string) => {
   const requestId = logPermitAction("Checking health permissions", { userId });
 
   try {
-    // Check all possible view permissions
-    const [canViewPersonal, canViewPartner, canViewPatient, canViewChild] = await Promise.all([
-      check("view", "PersonalHealth", userId),
-      check("view", "PartnerHealth", userId),
-      check("view", "PatientHealth", userId),
-      check("view", "ChildHealth", userId),
+    // Check permissions based on the defined actions
+    const [canViewFull, canViewLimited] = await Promise.all([
+      check("viewrecordsfull", "HealthRecords", userId),
+      check("viewrecordslimited", "HealthRecords", userId)
     ]);
 
     const permissions = {
-      canViewPersonal,    // For regular users viewing their own health
-      canViewPartner,     // For partners viewing their partner's health
-      canViewPatient,     // For doctors viewing patient health
-      canViewChild,       // For parents viewing child's health
+      canViewFull,     // For partners and parents viewing full records
+      canViewLimited,  // For doctors viewing limited records
+      canUpdate: await check("update", "HealthRecords", userId)
     };
 
     logPermitAction(`Health permissions result (${requestId})`, {
       userId,
       permissions,
     });
+
     return permissions;
   } catch (error) {
     console.error(
@@ -104,10 +100,9 @@ export const checkHealthPermissions = async (userId: string) => {
       error
     );
     return {
-      canViewPersonal: false,
-      canViewPartner: false,
-      canViewPatient: false,
-      canViewChild: false,
+      canViewFull: false,
+      canViewLimited: false,
+      canUpdate: false
     };
   }
 };

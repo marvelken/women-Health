@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import HealthTrackingModal from "./components/HealthTrackingModal";
+import HealthRecordsDisplay from "./components/HealthRecordsDisplay";
 
 export default function UserDashboard() {
   const [showShareModal, setShowShareModal] = useState(false);
@@ -41,6 +42,7 @@ export default function UserDashboard() {
           </button>
 
           {/* Health Tracking Modal */}
+          
           <HealthTrackingModal
             isOpen={showHealthTracking}
             onClose={() => setShowHealthTracking(false)}
@@ -105,19 +107,11 @@ export default function UserDashboard() {
         {/* Calendar */}
         <div className="lg:col-span-2 bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-gray-900">Calendar</h2>
-            <div className="flex items-center space-x-2">
-              <button className="text-gray-500 hover:text-gray-700">
-                <ChevronDown size={20} />
-              </button>
-            </div>
+            <h2 className="text-lg font-semibold text-gray-900">
+              Health Records
+            </h2>
           </div>
-          <div className="h-96 border rounded-lg">
-            {/* Calendar Component would go here */}
-            <div className="flex items-center justify-center h-full text-gray-500">
-              Calendar Component
-            </div>
-          </div>
+          <HealthRecordsDisplay />
         </div>
 
         {/* Tracking and Sharing Section */}

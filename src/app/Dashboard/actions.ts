@@ -1,10 +1,10 @@
+// src/app/Dashboard/actions.ts
 'use server'
 
 import { createClient } from '../../../utils/supabase/server'
-import { redirect } from 'next/navigation'
+import { revalidatePath } from 'next/cache'
 
-
-export async function getViewableRecords() {
+export async function addHealthRecord(formData: FormData) {
   try {
     const supabase = await createClient()
     const { data: { user }, error: userError } = await supabase.auth.getUser()
@@ -13,76 +13,50 @@ export async function getViewableRecords() {
       throw new Error('Not authenticated')
     }
 
-    // First get records shared with this user
-    const { data: sharedRecords, error: sharedError } = await supabase
-      .from('record_shares')
-      .select('owner_id')
-      .eq('shared_with_email', user.email)
-      .eq('active', true)
+    // Get form data
+    const record = {
+      user_id: user.id,
+      record_date: formData.get('date'),
+      period_flow: formData.get('flow'),
+      symptoms: formData.getAll('symptoms'),
+      mood: formData.get('mood'),
+      notes: formData.get('notes'),
+    }
 
-    if (sharedError) throw sharedError
-
-    // Get the list of owner IDs
-    const ownerIds = sharedRecords.map(record => record.owner_id)
-
-    // Then fetch actual health records
-    const { data: records, error: recordsError } = await supabase
+    const { error } = await supabase
       .from('health_records')
-      .select(`
-        *,
-        users:user_id (
-          email
-        )
-      `)
-      .or(`user_id.eq.${user.id},user_id.in.(${ownerIds.join(',')})`)
+      .insert([record])
 
-    if (recordsError) throw recordsError
+    if (error) throw error
 
-    return records
+    revalidatePath('/Dashboard')
+    return { success: true }
   } catch (error) {
-    console.error('Error fetching records:', error)
-    throw error
+    console.error('Error adding health record:', error)
+    return { success: false, error }
   }
 }
 
-export async function shareRecords(formData: FormData) {
+export async function getHealthRecords() {
   try {
     const supabase = await createClient()
-    const sharedWithEmail = formData.get('email') as string
-
-    // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
       throw new Error('Not authenticated')
     }
 
-    // Check if the shared_with_email exists
-    const { data: recipientData } = await supabase
-      .from('auth.users')
-      .select('id')
-      .eq('email', sharedWithEmail)
-      .single()
+    const { data, error } = await supabase
+      .from('health_records')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('record_date', { ascending: false })
 
-    if (!recipientData) {
-      throw new Error('Recipient not found')
-    }
+    if (error) throw error
 
-    // Create sharing record
-    const { error: shareError } = await supabase
-      .from('record_shares')
-      .insert([{
-        owner_id: user.id,
-        shared_with_email: sharedWithEmail,
-      }])
-
-    if (shareError) {
-      throw new Error('Failed to share records')
-    }
-
-    redirect('/dashboard?shared=true')
+    return data
   } catch (error) {
-    console.error('Server error:', error)
-    redirect('/error')
+    console.error('Error fetching health records:', error)
+    return []
   }
 }

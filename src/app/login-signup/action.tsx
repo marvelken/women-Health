@@ -80,7 +80,7 @@ export async function selectRole(formData: FormData) {
         case 'partner':
             redirect('/Dashboard')
         case 'doctor':
-            redirect('/Dashboard')
+            redirect('/DoctorDashboard')
         case 'parent':
             redirect('/Dashboard')
         default:

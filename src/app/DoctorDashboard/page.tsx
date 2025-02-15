@@ -3,6 +3,8 @@
 import { Users, Search, ClipboardList, Activity } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
+import { checkHealthPermissions } from "../../lib/permit";
+import { useRouter } from 'next/navigation';
 
 interface Patient {
   id: string;
@@ -18,10 +20,19 @@ interface Patient {
   records: any[];
 }
 
+interface Permissions {
+  canViewFull: boolean;
+  canViewLimited: boolean;
+  canUpdate: boolean;
+}
+
 export default function DoctorDashboard() {
   const [searchTerm, setSearchTerm] = useState("");
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
+  const [permissions, setPermissions] = useState<Permissions | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     async function fetchPatients() {
@@ -34,7 +45,19 @@ export default function DoctorDashboard() {
           error: userError,
         } = await supabase.auth.getUser();
         if (userError) throw userError;
-        if (!user) return;
+        if (!user) {
+          router.push('/login-signup');
+          return;
+        }
+
+        // Get user permissions
+        const userPermissions = await checkHealthPermissions(user.id);
+        setPermissions(userPermissions);
+
+        // Check if user has permission to view patient records
+        if (!userPermissions.canViewLimited && !userPermissions.canViewFull) {
+          throw new Error('Insufficient permissions to view patient records');
+        }
     
         // Get all shares for the current doctor
         const { data: shares, error: sharesError } = await supabase
@@ -74,11 +97,23 @@ export default function DoctorDashboard() {
         // For each share, get the health records
         const patientsWithRecords = await Promise.all(
           shares.map(async (share) => {
-            const { data: records, error: recordsError } = await supabase
+            // Determine which columns to select based on permissions
+            let query = supabase
               .from("health_records")
-              .select("*")
+              .select('*')
               .eq("user_id", share.owner_id)
               .order("record_date", { ascending: false });
+
+            // If user only has limited view, restrict columns
+            if (!userPermissions.canViewFull && userPermissions.canViewLimited) {
+              query = supabase
+                .from("health_records")
+                .select('id, record_date, period_flow, symptoms')
+                .eq("user_id", share.owner_id)
+                .order("record_date", { ascending: false });
+            }
+
+            const { data: records, error: recordsError } = await query;
     
             return {
               id: share.owner_id,
@@ -91,8 +126,9 @@ export default function DoctorDashboard() {
     
         console.log("Final patients data:", patientsWithRecords);
         setPatients(patientsWithRecords);
-      } catch (err) {
+      } catch (err: any) {
         console.error("Error fetching patients:", err);
+        setError(err.message);
         setPatients([]);
       } finally {
         setLoading(false);
@@ -100,7 +136,7 @@ export default function DoctorDashboard() {
     }
 
     fetchPatients();
-  }, []);
+  }, [router]);
 
   // Filter patients based on search
   const filteredPatients = patients.filter((patient) =>
@@ -119,6 +155,15 @@ export default function DoctorDashboard() {
             <div className="h-20 bg-gray-200 rounded-lg"></div>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="max-w-7xl mx-auto mt-[5%] p-4 bg-red-50 text-red-600 rounded-lg">
+        {error}
       </div>
     );
   }
@@ -196,10 +241,12 @@ export default function DoctorDashboard() {
                   <th className="pb-4">Patient Email</th>
                   <th className="pb-4">Last Record Date</th>
                   <th className="pb-4">Current Flow</th>
-                  {/* <th className="pb-4">Recent Symptoms</th> */}
-                  <th className="pb-4">Mood</th>
-                  <th className="pb-4">Notes</th>
-                  {/* <th className="pb-4">Actions</th> */}
+                  {permissions?.canViewFull && (
+                    <>
+                      <th className="pb-4">Mood</th>
+                      <th className="pb-4">Notes</th>
+                    </>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
@@ -220,36 +267,16 @@ export default function DoctorDashboard() {
                         </span>
                       )}
                     </td>
-                    {/* <td className="py-4">
-                      <div className="flex flex-wrap gap-1">
-                        {patient.latestRecord?.symptoms && (
-                          <>
-                            {patient.latestRecord.symptoms
-                              .slice(0, 2)
-                              .map((symptom, index) => (
-                                <span
-                                  key={index}
-                                  className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
-                                >
-                                  {symptom}
-                                </span>
-                              ))}
-                            {patient.latestRecord.symptoms.length > 2 && (
-                              <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
-                                +{patient.latestRecord.symptoms.length - 2} more
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                    </td> */}
-                    <td className="py-4">
-                      {patient.latestRecord?.mood || 'N/A'}
-                    </td>
-                    <td className="py-4 max-w-xs truncate">
-                      {patient.latestRecord?.notes || 'No notes'}
-                    </td>
-                    
+                    {permissions?.canViewFull && (
+                      <>
+                        <td className="py-4">
+                          {patient.latestRecord?.mood || 'N/A'}
+                        </td>
+                        <td className="py-4 max-w-xs truncate">
+                          {patient.latestRecord?.notes || 'No notes'}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

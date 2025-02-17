@@ -49,9 +49,13 @@ export const verifyUserExists = async (userId: string): Promise<boolean> => {
 };
 
 // Permission check function
+// In your permit.ts file, update the check function:
 const check = async (action: Actions, resource: Resources, userId: string) => {
   try {
-    const response = await fetch('/api/permit/check', {
+    // Get the base URL - in development it's localhost, in production your domain
+    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000';
+    
+    const response = await fetch(`${baseUrl}/api/permit/check`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

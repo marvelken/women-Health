@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, Calendar, Activity, Search, ClipboardList } from "lucide-react";
+import { Heart, Search, Activity, Calendar } from "lucide-react";
 import { useState, useEffect } from "react";
 import { createClient } from "../../../utils/supabase/client";
 import { checkHealthPermissions } from "../../lib/permit";
@@ -15,7 +15,6 @@ interface Patient {
     symptoms: string[];
     mood?: string;
     notes?: string;
-    temperature?: number;
   };
   records: any[];
 }
@@ -54,7 +53,7 @@ export default function PartnerDashboard() {
         const userPermissions = await checkHealthPermissions(user.id);
         setPermissions(userPermissions);
 
-        // Check if user has permission to view patient records
+        // Check if user has permission to view partner records
         if (!userPermissions.canViewLimited && !userPermissions.canViewFull) {
           throw new Error('Insufficient permissions to view partner records');
         }
@@ -167,7 +166,7 @@ export default function PartnerDashboard() {
     );
   }
 
-  // Empty state UI (no patients or error)
+  // Empty state UI
   if (patients.length === 0) {
     return (
       <div className="max-w-7xl mx-auto mt-[5%]">
@@ -209,7 +208,7 @@ export default function PartnerDashboard() {
 
   // Dashboard with partner data
   return (
-    <div className="max-w-7xl mx-auto mt-[5%]">
+    <div className="max-w-7xl mx-7  mt-[5%]">
       {/* Header Section */}
       <div className="flex items-center justify-between mb-8">
         <h1 className="text-2xl font-semibold text-gray-900 flex items-center">
@@ -219,7 +218,7 @@ export default function PartnerDashboard() {
         <div className="relative">
           <input
             type="text"
-            placeholder="Search partner's records..."
+            placeholder="Search records..."
             className="pl-10 pr-4 py-2 border rounded-md"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
@@ -228,7 +227,7 @@ export default function PartnerDashboard() {
         </div>
       </div>
 
-      {/* Partner Records List */}
+      {/* Records Grid */}
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredPatients.map((patient) => (
           <div 
@@ -249,69 +248,62 @@ export default function PartnerDashboard() {
               />
             </div>
 
-            {/* Record Body */}
+            {/* Record Content */}
             <div className="p-4">
               {patient.latestRecord ? (
                 <>
-                  <div className="mb-3">
-                    <p className="text-sm text-gray-600 mb-1">
-                      <strong>Date:</strong> {new Date(patient.latestRecord.record_date).toLocaleDateString()}
-                    </p>
-                    
-                    {patient.latestRecord.period_flow && (
-                      <div className="mb-2">
-                        <span className="inline-block px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
-                          Flow: {patient.latestRecord.period_flow}
-                        </span>
-                      </div>
-                    )}
+                  <p className="text-sm text-gray-600 mb-2">
+                    <strong>Last Update:</strong> {new Date(patient.latestRecord.record_date).toLocaleDateString()}
+                  </p>
+                  
+                  {patient.latestRecord.period_flow && (
+                    <div className="mb-2">
+                      <span className="inline-block px-2 py-1 bg-indigo-100 text-indigo-800 rounded-full text-xs">
+                        Flow: {patient.latestRecord.period_flow}
+                      </span>
+                    </div>
+                  )}
 
-                    {patient.latestRecord.symptoms && patient.latestRecord.symptoms.length > 0 && (
-                      <div className="mb-2">
-                        <p className="text-sm text-gray-600 mb-1">Symptoms:</p>
-                        <div className="flex flex-wrap gap-1">
-                          {patient.latestRecord.symptoms.slice(0, 3).map((symptom, index) => (
-                            <span 
-                              key={index} 
-                              className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
-                            >
-                              {symptom}
-                            </span>
-                          ))}
-                          {patient.latestRecord.symptoms.length > 3 && (
-                            <span className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs">
-                              +{patient.latestRecord.symptoms.length - 3} more
-                            </span>
-                          )}
+                  {patient.latestRecord.symptoms && patient.latestRecord.symptoms.length > 0 && (
+                    <div className="mb-2">
+                      <p className="text-sm text-gray-600 mb-1">Symptoms:</p>
+                      <div className="flex flex-wrap gap-1">
+                        {patient.latestRecord.symptoms.map((symptom, index) => (
+                          <span 
+                            key={index} 
+                            className="px-2 py-1 bg-gray-100 text-gray-800 rounded-full text-xs"
+                          >
+                            {symptom}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {permissions?.canViewFull && (
+                    <>
+                      {patient.latestRecord.mood && (
+                        <div className="mb-2 flex items-center">
+                          <Activity className="mr-2 text-gray-400" size={18} />
+                          <span className="text-sm text-gray-600">
+                            Mood: {patient.latestRecord.mood}
+                          </span>
                         </div>
-                      </div>
-                    )}
+                      )}
 
-                    {permissions?.canViewFull && (
-                      <>
-                        {patient.latestRecord.mood && (
-                          <div className="mb-2 flex items-center">
-                            <Activity className="mr-2 text-gray-400" size={18} />
-                            <span className="text-sm text-gray-600">
-                              Mood: {patient.latestRecord.mood}
-                            </span>
-                          </div>
-                        )}
-
-                        {patient.latestRecord.notes && (
-                          <div className="mt-2 p-2 bg-gray-50 rounded-md">
-                            <p className="text-sm text-gray-600 italic">
-                              "{patient.latestRecord.notes}"
-                            </p>
-                          </div>
-                        )}
-                      </>
-                    )}
-                  </div>
+                      {patient.latestRecord.notes && (
+                        <div className="mt-2 p-2 bg-gray-50 rounded-md">
+                          <p className="text-sm text-gray-600 italic">
+                            {patient.latestRecord.notes}
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  )}
                 </>
               ) : (
                 <div className="text-center text-gray-500">
-                  No recent records
+                  No records available
                 </div>
               )}
             </div>

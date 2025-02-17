@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 import { createClient } from '../../../utils/supabase/server'
-import { syncUserToPermit, verifyUserExists, type UserRole } from '../../lib/permit'
+import { syncUserToPermit, checkHealthPermissions, verifyUserExists, type UserRole } from '../../lib/permit'
 
 export async function login(formData: FormData) {
     const supabase = await createClient()
@@ -21,16 +21,32 @@ export async function login(formData: FormData) {
     }
 
     if (userData?.user) {
+        console.log("Logged in user:", userData.user) // Debug the user object
+        
         // Check if user has a role in Permit.io
         const hasRole = await verifyUserExists(userData.user.id)
         
         if (!hasRole) {
             redirect('/select-role')
+            return // Add return to prevent further execution
+        }
+
+        // Get permissions using the user ID from Supabase auth
+        const permissions = await checkHealthPermissions(userData.user.id)
+        console.log('User Permissions:', permissions) // Debug permissions
+
+        if (permissions.canViewLimited && !permissions.canViewFull && !permissions.canUpdate) {
+            redirect('/DoctorDashboard')
+        } 
+        else if (permissions.canViewFull && !permissions.canUpdate) {
+            redirect('/PatnerDashboard')
+        }
+        else if (permissions.canViewFull && permissions.canUpdate) {
+            redirect('/Dashboard')
         }
     }
 
-    revalidatePath('/', 'layout')
-    redirect('/Dashboard')
+    redirect('/login-signup')
 }
 
 export async function signup(formData: FormData) {
